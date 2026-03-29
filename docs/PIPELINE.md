@@ -8,37 +8,38 @@
                             │  (raw, messy)    │
                             └────────┬─────────┘
                                      │
-                            ┌────────▼─────────┐
-                            │  PREPROCESSOR    │
-                            │  Parse & label   │
-                            └────────┬─────────┘
+                       ┌─────────────▼──────────────┐
+                       │     PLANNING ADVISOR       │
+                       │  (collaborative session)   │
+                       │                            │
+                       │  - Asks clarifying Qs      │
+                       │  - Proposes architecture   │
+                       │  - Suggests scope          │◄──── Project Memory
+                       │  - Drafts acceptance       │
+                       │    criteria together        │
+                       │  - Challenges assumptions  │
+                       │                            │
+                       │  User ←──→ Advisor         │
+                       │  (back-and-forth dialogue) │
+                       └─────────────┬──────────────┘
                                      │
-                            StructuredPrompt
+                              DraftPlanDocument
                                      │
                             ┌────────▼─────────┐
-                        ┌───│  PROMPT COMPILER  │───┐
-                        │   │  Validate         │   │
-                     REJECT └──────────────────┘  ACCEPT
+                        ┌───│  READINESS GATE  │───┐
+                        │   │  (mechanical      │   │
+                        │   │   checklist)      │   │
+                        │   └──────────────────┘   │
+                      FAIL                        PASS
                         │                           │
-               RejectionReport              ValidatedPrompt
-               (back to user                        │
-                with specific              ┌────────▼─────────┐
-                error messages)            │   PLAN AGENT     │
-                                           │   + Project      │
-                                           │     Memory       │
-                                           └────────┬─────────┘
-                                                    │
-                                               DraftPlan
-                                                    │
-                                           ┌────────▼─────────┐
-                                       ┌───│  PLAN REVIEWER   │───┐
-                                       │   └──────────────────┘   │
-                                    REJECT                      APPROVE
-                                       │                           │
-                                  (loop: max 2              PlanDocument
-                                   revisions,               (validated)
-                                   then escalate                │
-                                   to human)                    │
+                  (specific gaps              PlanDocument
+                   fed back to                (validated)
+                   advisor,                        │
+                   conversation                    │
+                   continues;                      │
+                   max 3 rounds                    │
+                   then escalate                   │
+                   to human)                       │
                                                     ┌───────────┴──────────┐
                                                     │                      │
                                            ┌────────▼─────────┐  ┌────────▼─────────┐
@@ -118,63 +119,63 @@
 
 ## Stage 1: PLAN — Detailed Breakdown
 
-### 1.1 Prompt Preprocessor
+### 1.1 Planning Advisor
 
-**Purpose:** Transform unstructured human input into labeled, discrete units.
+**Purpose:** Collaboratively develop a complete, specific plan through conversation with the user. Acts as a senior developer mentoring a junior developer — never demands a perfect prompt, instead helps build one.
 
-**Input:** Raw string (user's natural language prompt, possibly rambling, multi-concern, or ambiguous).
-
-**Processing:**
-- Segment the input into discrete concerns using NLP/LLM classification
-- Label each segment: `feature_request`, `bug_report`, `architecture_question`, `clarification`, `refinement`
-- Extract entities: file references, function names, technology mentions
-- Flag contradictions within the input
-
-**Output:** StructuredPrompt JSON — an array of labeled, segmented concerns with extracted entities.
-
-**Failure mode:** If the input is completely unintelligible, return a HelpRequest asking the user to rephrase specific sections.
-
-### 1.2 Prompt Compiler
-
-**Purpose:** Validate that each structured concern meets minimum completeness requirements.
-
-**Validation checklist (configurable per project):**
-- [ ] Specifies what the feature/fix should DO (not just what it should look like)
-- [ ] Defines expected inputs and outputs (or states that there are none)
-- [ ] Scoped to a single concern (if multiple, suggest splitting)
-- [ ] References existing architecture where relevant (for iteration 2+)
-- [ ] Includes at least one testable acceptance criterion
-
-**Output on success:** ValidatedPrompt (same as StructuredPrompt, with validation metadata).
-**Output on failure:** RejectionReport — specific, actionable error messages per failed check.
-
-### 1.3 Plan Agent
-
-**Purpose:** Generate a development plan from the validated prompt.
-
-**Inputs:**
-- ValidatedPrompt
+**Input:**
+- Raw user prompt (natural language, any level of specificity)
 - Project Memory (architecture docs, dependency maps, known issues, previous decisions)
 
-**Output:** DraftPlan containing:
-- Architecture decisions with explicit rationale
-- Task breakdown with dependencies
-- Acceptance criteria per task (must be mechanically testable)
-- Scope boundaries (what this iteration explicitly does NOT include)
-- Risk assessment (what could go wrong, what's uncertain)
+**Behavior:**
+The Planning Advisor engages in an interactive dialogue with the user. It does NOT passively wait for a perfect prompt. On receiving any input, it:
 
-### 1.4 Plan Reviewer
+1. **Acknowledges what's clear** — Reflects back what it understood to confirm alignment.
+2. **Identifies gaps** — Determines what's missing from the Readiness Checklist (see 1.2) and formulates targeted questions.
+3. **Proposes, doesn't just ask** — Instead of "what architecture do you want?", it says "based on your description, I'd suggest X architecture because Y — does that align with your thinking, or did you have something else in mind?"
+4. **Challenges assumptions** — If the user's idea has potential issues, the advisor raises them early: "This approach works, but be aware it means Z trade-off. Are you okay with that?"
+5. **Manages scope proactively** — If the user's request is too large for one iteration, the advisor suggests how to split it and which piece to build first.
+6. **Drafts incrementally** — As the conversation progresses, the advisor builds up a DraftPlanDocument piece by piece, confirming each section with the user.
 
-**Purpose:** Adversarial review of the plan before any code is written.
+**Session state:** The advisor maintains a running view of:
+- Which Readiness Checklist items are satisfied
+- Which items still need work
+- The current DraftPlanDocument (updated after each exchange)
 
-**Review criteria:**
-- Does the plan actually address the user's validated prompt?
-- Are acceptance criteria specific enough to write tests from?
-- Are there missing edge cases?
-- Is the scope realistic for a single iteration?
-- Do architecture decisions conflict with existing project decisions?
+**When the advisor believes all checklist items are covered**, it presents the DraftPlanDocument to the user for final confirmation, then submits it to the Readiness Gate.
 
-**Loop guard:** Max 2 revision cycles. If the plan still fails review, escalate to human with specific questions about what's ambiguous.
+**Key design principle:** The advisor does the heavy lifting. A user can start with "I want a CLI tool that does something with CSV files" and the advisor will collaboratively refine that into a complete plan with architecture, acceptance criteria, and scope boundaries. The user provides intent and makes decisions; the advisor provides structure and specificity.
+
+### 1.2 Readiness Gate
+
+**Purpose:** Mechanical validation that the DraftPlanDocument meets minimum requirements before it can enter the Build stage. This is the "compiler" — but it validates the plan, not the user's prompt.
+
+**Readiness Checklist (configurable per project):**
+
+| Requirement | What it checks | Why it's required |
+|------------|---------------|-------------------|
+| Behavioral description | The plan describes what the feature/fix DOES, not just what it looks like | Prevents the Build stage from guessing intent |
+| Input/output specification | Explicit I/O definitions or explicit "none" | Test Agent needs this to write meaningful tests |
+| Testable acceptance criteria (min 3) | Each criterion has a measurable outcome, not a subjective quality | Mutation Tester needs mechanically verifiable criteria |
+| Scope boundaries | Both in-scope AND out-of-scope items listed | Prevents scope creep during Build |
+| Architecture decisions | New components/dependencies have rationale and alternatives considered | Prevents accidental complexity |
+| Risk identification | At least one risk acknowledged | Forces consideration of what could go wrong |
+
+**Validation is mechanical:** Each checklist item maps to a structural check on the JSON document. "Does the `acceptance_criteria` array have >= 3 items?" "Does each item have a non-empty `measurable_outcome` field?" "Is the `out_of_scope` array non-empty?" No LLM judgment — just schema and structural validation.
+
+**On failure:** The gate returns the specific gaps (not a generic rejection) to the Planning Advisor. The advisor then continues the conversation with the user, focusing on the missing items. The user never sees the raw checklist failure — the advisor translates it into natural conversation.
+
+**Loop guard:** Max 3 Readiness Gate attempts. If the plan still doesn't pass, escalate to the user with a structured report showing exactly which requirements aren't met and what the advisor has tried. This likely indicates the readiness checklist itself is misconfigured for the project type, not that the user's idea is bad.
+
+### Planning Stage — What Changed and Why
+
+The original design (Preprocessor → Prompt Compiler → Plan Agent → Plan Reviewer) had the hard gate at the INPUT to planning. This placed the entire burden on the user: "give me a complete, specific prompt or I reject it." This is backwards for several reasons:
+
+1. **Users don't think in specs.** They think in vague intentions. The AI should help them get to specificity, not demand it.
+2. **Rejection is demoralizing.** Being told "your prompt is incomplete" without help fixing it is the exact frustration that makes people abandon structured workflows.
+3. **The AI is better at structuring than the user.** An LLM can take a vague idea and propose specific architecture, acceptance criteria, and scope far more efficiently than a human can write them from scratch.
+
+The new design puts the gate at the OUTPUT. The user provides intent, the AI provides structure, and the gate ensures the result is complete before it reaches the Build stage. The human makes decisions; the AI does legwork; the gate enforces standards.
 
 ## Stage 2: BUILD — Detailed Breakdown
 

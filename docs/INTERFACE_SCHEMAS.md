@@ -30,106 +30,71 @@ Every interface document includes:
 }
 ```
 
-The `parent_document_id` creates a linked chain: ReviewReport → BuildReport → PlanDocument → ValidatedPrompt. Walk the chain to reconstruct the full history of any feature.
+The `parent_document_id` creates a linked chain: ReviewReport → BuildReport → PlanDocument. Walk the chain to reconstruct the full history of any feature.
 
 ---
 
-## StructuredPrompt
+## PlanningSession
 
-**Produced by:** Preprocessor
-**Consumed by:** Prompt Compiler
+**Produced by:** Planning Advisor (as a side-effect of the conversation)
+**Consumed by:** Project Memory (for audit trail), not consumed by Build stage
+
+The PlanningSession captures the collaborative dialogue for auditability. It is NOT an interface document between stages — the PlanDocument is. The session is archived for context.
 
 ```json
 {
   "...header": {},
-  "raw_input": "string (original user text, preserved verbatim)",
-  "concerns": [
+  "raw_user_input": "string (original user text, preserved verbatim)",
+  "exchanges": [
     {
-      "id": "concern-001",
-      "type": "feature_request | bug_report | architecture_question | clarification | refinement",
-      "summary": "string (one-sentence description)",
-      "detail": "string (extracted relevant text)",
-      "entities": {
-        "files": ["string"],
-        "functions": ["string"],
-        "technologies": ["string"],
-        "references": ["string (links, issue numbers, etc.)"]
-      },
-      "contradictions": ["string (if this concern conflicts with another)"]
+      "turn": "int",
+      "speaker": "user | advisor",
+      "content": "string",
+      "readiness_snapshot": {
+        "behavioral_description": "met | unmet",
+        "input_output_spec": "met | unmet",
+        "acceptance_criteria": "met | unmet (N of M required)",
+        "scope_boundaries": "met | unmet",
+        "architecture_decisions": "met | unmet | not_applicable",
+        "risk_identification": "met | unmet"
+      }
+    }
+  ],
+  "readiness_gate_attempts": [
+    {
+      "attempt": "int",
+      "gaps": ["string (specific requirements not yet met)"],
+      "outcome": "passed | failed"
     }
   ],
   "session_context": {
     "iteration_number": "int (1 for greenfield, 2+ for subsequent)",
-    "previous_task_ids": ["string"]
+    "previous_task_ids": ["string"],
+    "project_memory_refs": ["string (documents consulted from Project Memory)"]
   }
 }
 ```
 
 ---
 
-## ValidatedPrompt
+## ReadinessResult
 
-**Produced by:** Prompt Compiler
-**Consumed by:** Plan Agent
-
-Same structure as StructuredPrompt, with added validation metadata:
-
-```json
-{
-  "...structured_prompt_fields": {},
-  "validation": {
-    "passed": true,
-    "checks": [
-      {
-        "check": "specifies_behavior",
-        "passed": true,
-        "note": "string | null"
-      },
-      {
-        "check": "defines_inputs_outputs",
-        "passed": true,
-        "note": "string | null"
-      },
-      {
-        "check": "single_concern_scope",
-        "passed": true,
-        "note": "string | null"
-      },
-      {
-        "check": "references_architecture",
-        "passed": true,
-        "note": "Greenfield — no existing architecture to reference"
-      },
-      {
-        "check": "has_testable_criteria",
-        "passed": true,
-        "note": "string | null"
-      }
-    ]
-  }
-}
-```
-
----
-
-## RejectionReport
-
-**Produced by:** Prompt Compiler (or Plan Reviewer, or any validation gate)
-**Consumed by:** User (or upstream agent)
+**Produced by:** Readiness Gate
+**Consumed by:** Planning Advisor (on failure) or pipeline orchestrator (on success)
 
 ```json
 {
   "...header": {},
-  "rejected_document_id": "uuid of the document that failed validation",
-  "rejection_type": "incomplete_prompt | ambiguous_spec | weak_plan | ...",
-  "errors": [
+  "plan_document_id": "uuid of the DraftPlanDocument being validated",
+  "passed": "bool",
+  "checklist": [
     {
-      "check": "string (which validation check failed)",
-      "severity": "blocking | warning",
-      "message": "string (human-readable explanation)",
-      "suggestion": "string (specific action to fix it)"
+      "requirement": "behavioral_description | input_output_spec | acceptance_criteria | scope_boundaries | architecture_decisions | risk_identification",
+      "status": "met | unmet",
+      "detail": "string (what's missing or what satisfied it)"
     }
-  ]
+  ],
+  "gaps_summary": "string | null (human-readable summary of what's still needed, null if passed)"
 }
 ```
 
@@ -137,7 +102,7 @@ Same structure as StructuredPrompt, with added validation metadata:
 
 ## PlanDocument
 
-**Produced by:** Plan Agent → Plan Reviewer (approved)
+**Produced by:** Planning Advisor → Readiness Gate (validated)
 **Consumed by:** Test Agent, Implementation Agent, Code Reviewer
 
 This is the central document of the pipeline. Everything downstream derives from it.

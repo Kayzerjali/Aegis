@@ -6,7 +6,7 @@ Aegis applies SOLID principles not to application code, but to the development p
 
 | Principle | Application in Aegis |
 |-----------|---------------------|
-| **Single Responsibility** | Each agent has exactly one job. The preprocessor parses. The compiler validates. The planner plans. The test agent writes tests. The implementation agent implements. No agent holds two responsibilities. |
+| **Single Responsibility** | Each agent has exactly one job. The Planning Advisor collaborates. The Readiness Gate validates. The test agent writes tests. The implementation agent implements. No agent holds two responsibilities. |
 | **Open/Closed** | Each stage is a sub-pipeline, closed for modification but open for extension. Adding a security review agent to Stage 3 does not require changes to Stage 2. |
 | **Liskov Substitution** | Any LLM (Claude, GPT, Gemini, fine-tuned local model) can fill any agent role as long as it consumes the correct input document and produces a conforming output document. Swap agents without changing the pipeline. |
 | **Interface Segregation** | Stages communicate exclusively through typed interface documents. The test agent receives only the spec — never the implementation. The implementation agent receives only the spec — never the tests. Each agent gets exactly the interface it needs, nothing more. |
@@ -24,10 +24,10 @@ Aegis applies SOLID principles not to application code, but to the development p
 │   STAGE 1     │   │   STAGE 2     │   │   STAGE 3     │
 │    PLAN       │──▶│    BUILD      │──▶│    REVIEW      │
 │               │   │               │   │               │
-│ Preprocessor  │   │ Test Agent    │   │ Code Reviewer │
-│ Compiler      │   │ Mutation Test │   │ Doc Generator │
-│ Plan Agent    │   │ Impl Agent    │   │ Memory Update │
-│ Plan Reviewer │   │ Test Runner   │   │               │
+│ Planning      │   │ Test Agent    │   │ Code Reviewer │
+│  Advisor      │   │ Mutation Test │   │ Doc Generator │
+│ Readiness     │   │ Impl Agent    │   │ Memory Update │
+│  Gate         │   │ Test Runner   │   │               │
 │               │   │ Debug Agent   │   │               │
 │               │   │ Fresh Agent   │   │               │
 └───────────────┘   └───────────────┘   └───────────────┘
@@ -41,13 +41,23 @@ Aegis applies SOLID principles not to application code, but to the development p
 **Input:** Raw user prompt (natural language, unstructured)
 **Output:** PlanDocument (validated JSON)
 
-Components:
-1. **Prompt Preprocessor** — Parses messy human input into discrete, labeled concerns (feature request, bug fix, architecture question, clarification). This is a parser, not a validator. It structures; it does not judge.
-2. **Prompt Compiler** — Validates each structured concern against a completeness checklist. Does the prompt specify inputs and outputs? Does it reference existing architecture? Is scope bounded to a single concern? Rejects with specific error messages, like a compiler.
-3. **Plan Agent** — Generates architecture decisions, task breakdown, and acceptance criteria from the validated prompt. Consumes Project Memory for codebase context on iteration 2+.
-4. **Plan Reviewer** — A separate agent that audits the plan. Does it solve what the user asked? Are edge cases addressed? Is scope realistic for one iteration? Can acceptance criteria be mechanically tested?
+The planning stage is **collaborative, not gatekeeping**. It behaves like a senior developer mentoring a junior developer — asking questions, proposing architecture, challenging assumptions, and helping the user refine their vision. The hard gate is at the OUTPUT (Readiness Gate), not the input.
 
-**Separation of concerns:** The preprocessor and compiler are distinct (Single Responsibility). The preprocessor handles structure ("I can't parse this"), the compiler handles completeness ("this is missing acceptance criteria"). Different failure modes, different error messages, different fixes.
+Components:
+1. **Planning Advisor** — An interactive, conversational agent that works with the user to develop a complete plan. It receives the raw user prompt and Project Memory, then engages in a back-and-forth dialogue: asking clarifying questions, proposing architectural approaches, suggesting scope boundaries, and drafting acceptance criteria collaboratively. The advisor does the heavy lifting — it doesn't demand the user provide a perfect prompt, it helps them build one.
+2. **Readiness Gate** — A mechanical validation checkpoint at the output of the planning stage. Before a PlanDocument can be emitted and passed to the Build stage, the Readiness Gate verifies that specific requirements are met to a minimum level of specificity. If requirements are not met, the specific gaps are fed back to the Planning Advisor and the conversation continues. This is the "compiler" — but it validates the plan, not the user's prompt.
+
+**Readiness Checklist (configurable per project):**
+- [ ] Behavioral description: what the feature/fix does (not just what it looks like)
+- [ ] Input/output specification (or explicit statement that there are none)
+- [ ] At least N testable acceptance criteria (default N=3) with measurable outcomes
+- [ ] Scope boundaries: what is in-scope AND what is explicitly out-of-scope
+- [ ] Architecture decisions with rationale (if new components or dependencies are introduced)
+- [ ] Risk identification (at least one risk considered, even if likelihood is low)
+
+**Design rationale:** The previous design (Preprocessor → Prompt Compiler → Plan Agent → Plan Reviewer) placed the burden on the user to provide a complete prompt before any AI assistance. This is backwards — the AI should help the user get to completeness, not demand it upfront. The gate-at-output design means the user can start with a vague idea and the advisor will collaboratively refine it until the Readiness Gate is satisfied.
+
+**Separation of concerns:** The Planning Advisor is conversational and warm (helps the user). The Readiness Gate is mechanical and strict (validates the output). The advisor's job is collaboration; the gate's job is enforcement. Neither does the other's job.
 
 ### Stage 2: BUILD
 
@@ -88,13 +98,23 @@ The stack of interface documents (PlanDocument → BuildReport → ReviewReport)
 Stages are decoupled through strictly-typed JSON documents validated against JSON Schemas. This is the physical manifestation of the Interface Segregation Principle.
 
 ```
-User ──▶ [Preprocessor] ──▶ StructuredPrompt
-StructuredPrompt ──▶ [Compiler] ──▶ ValidatedPrompt | RejectionReport
-ValidatedPrompt ──▶ [Plan Agent] ──▶ DraftPlan
-DraftPlan ──▶ [Plan Reviewer] ──▶ PlanDocument | PlanRejection
-PlanDocument ──▶ [Build Stage] ──▶ BuildReport
-BuildReport ──▶ [Review Stage] ──▶ ReviewReport
-ReviewReport ──▶ [Project Memory]
+User ←──→ [Planning Advisor] ←──→ (interactive conversation)
+                    │
+                    ▼ (advisor believes requirements are met)
+              DraftPlanDocument
+                    │
+                    ▼
+             [Readiness Gate] ──── FAIL ──→ (gaps fed back to advisor,
+                    │                        conversation continues)
+                  PASS
+                    │
+              PlanDocument (validated)
+                    │
+              [Build Stage] ──▶ BuildReport
+                    │
+              [Review Stage] ──▶ ReviewReport
+                    │
+              [Project Memory]
 ```
 
 Each arrow is a typed contract. If the output doesn't conform to the schema, the producing agent is asked to retry (with the schema violation as feedback). This is mechanical validation — no LLM judgment involved.
@@ -111,10 +131,10 @@ Every loop in the pipeline has a circuit breaker:
 
 | Loop | Max Iterations | Escalation Target |
 |------|---------------|-------------------|
-| Mutation Tester → Test Agent | 3 rounds | Escalate to Plan Reviewer (acceptance criteria may be ambiguous) |
+| Mutation Tester → Test Agent | 3 rounds | Escalate to Planning Advisor (acceptance criteria may be ambiguous) |
 | Test Runner → Debug Agent | 3 attempts | Escalate to Fresh Agent (clean context) |
 | Fresh Agent → Test Runner | 2 attempts | Escalate to Human with structured "I'm stuck" report |
-| Plan Reviewer → Plan Agent | 2 revisions | Escalate to Human with specific questions |
+| Readiness Gate → Planning Advisor | 3 rounds | Escalate to Human (readiness requirements may be misconfigured) |
 
 The "I'm stuck" report is not a vague failure message. It contains:
 - What was attempted (each iteration's approach)

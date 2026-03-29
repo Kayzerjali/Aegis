@@ -111,3 +111,31 @@
 **Decision:** Build the complete pipeline skeleton with mock agents first. Mock agents return canned, valid documents. Prove the state machine, schema validation, loop guards, and Docker test runner work before adding LLM intelligence.
 **Rationale:** If the pipeline plumbing is broken, LLM agents will mask it with plausible-looking output. Testing infrastructure with deterministic mocks isolates pipeline bugs from agent bugs.
 **Trade-off:** Delays the "wow moment" of seeing agents actually work. Accepted because a broken pipeline with real agents is worse than a working pipeline with mock agents.
+
+---
+
+## ADR-011: Collaborative Planning Advisor with Gate-at-Output (replaces ADR-001 Stage 1 detail)
+
+**Date:** 2026-03-29
+**Status:** Accepted (supersedes the Preprocessor → Prompt Compiler → Plan Agent → Plan Reviewer design)
+
+**Context:** The original Stage 1 design placed hard gates at the INPUT to planning — a Prompt Compiler that rejected incomplete prompts and sent the user back to try again. This put the entire burden on the user to provide a complete, specific prompt before receiving any AI assistance. In practice, users start with vague ideas and need help refining them, not rejection.
+
+**Decision:** Replace the Preprocessor, Prompt Compiler, Plan Agent, and Plan Reviewer with two components:
+1. **Planning Advisor** — A conversational agent that collaboratively develops a plan with the user. It asks questions, proposes architecture, challenges assumptions, and drafts incrementally. It does the heavy lifting of turning vague intent into specific plans.
+2. **Readiness Gate** — A mechanical validation checkpoint at the OUTPUT. Before a PlanDocument can enter the Build stage, it must pass a structural checklist (behavioral description, I/O spec, acceptance criteria, scope boundaries, architecture decisions, risk identification). On failure, specific gaps are fed back to the advisor and the conversation continues.
+
+**Rationale:**
+- Users don't think in specs. They think in vague intentions. The AI should help them get to specificity.
+- Rejection without assistance is demoralizing and causes workflow abandonment.
+- The AI is better at structuring requirements than the user is at writing them from scratch.
+- Hard gates are preserved (at the output), so the Build stage still receives a complete, validated plan.
+- Mirrors how a senior developer mentors a junior developer — collaborative, not gatekeeping.
+
+**Trade-off:** The Planning Advisor is more expensive per invocation than a simple prompt compiler (it's a multi-turn conversation, not a one-shot validation). Accepted because the cost of a good plan is negligible compared to the cost of building from a bad plan. A bad plan causes cascading failures through Build and Review, wasting far more compute than a thorough planning conversation.
+
+**What's preserved from the original design:**
+- The hard gate concept (Readiness Gate = the "compiler")
+- Mechanical validation (no LLM judges the plan's readiness — structural checks only)
+- The PlanDocument schema (unchanged — the output is the same, just produced differently)
+- Circuit breaker (max 3 Readiness Gate attempts before human escalation)
