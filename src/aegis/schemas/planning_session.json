@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegis.dev/schemas/planning_session.json",
+  "title": "PlanningSession",
+  "description": "Captures the collaborative dialogue between user and Planning Advisor. Archived for audit trail, not consumed by Build stage.",
+  "type": "object",
+  "required": [
+    "aegis_version",
+    "document_type",
+    "document_id",
+    "project_id",
+    "task_id",
+    "timestamp",
+    "stage",
+    "status",
+    "raw_user_input",
+    "exchanges"
+  ],
+  "properties": {
+    "aegis_version": { "type": "string" },
+    "document_type": { "type": "string", "const": "PlanningSession" },
+    "document_id": { "type": "string", "format": "uuid" },
+    "parent_document_id": { "type": ["string", "null"] },
+    "project_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "stage": { "type": "string", "enum": ["plan", "build", "review"] },
+    "status": { "type": "string", "enum": ["draft", "validated", "rejected", "approved"] },
+    "raw_user_input": {
+      "type": "string",
+      "description": "Original user text, preserved verbatim"
+    },
+    "exchanges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["turn", "speaker", "content"],
+        "properties": {
+          "turn": { "type": "integer", "minimum": 1 },
+          "speaker": { "type": "string", "enum": ["user", "advisor"] },
+          "content": { "type": "string" },
+          "readiness_snapshot": {
+            "type": "object",
+            "properties": {
+              "behavioral_description": { "type": "string", "enum": ["met", "unmet"] },
+              "input_output_spec": { "type": "string", "enum": ["met", "unmet"] },
+              "acceptance_criteria": { "type": "string" },
+              "scope_boundaries": { "type": "string", "enum": ["met", "unmet"] },
+              "architecture_decisions": { "type": "string", "enum": ["met", "unmet", "not_applicable"] },
+              "risk_identification": { "type": "string", "enum": ["met", "unmet"] }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "readiness_gate_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["attempt", "outcome"],
+        "properties": {
+          "attempt": { "type": "integer", "minimum": 1 },
+          "gaps": { "type": "array", "items": { "type": "string" } },
+          "outcome": { "type": "string", "enum": ["passed", "failed"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "session_context": {
+      "type": "object",
+      "properties": {
+        "iteration_number": { "type": "integer", "minimum": 1 },
+        "previous_task_ids": { "type": "array", "items": { "type": "string" } },
+        "project_memory_refs": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

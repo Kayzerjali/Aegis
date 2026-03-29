@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aegis-dev"
+version = "0.1.0"
+description = "Development Process Compiler — enforces structured, verifiable AI-assisted development"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mutmut>=3.0",
+]
+
+[project.scripts]
+aegis = "aegis.cli.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aegis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mutmut]
+paths_to_mutate = "src/aegis/"
+tests_dir = "tests/"

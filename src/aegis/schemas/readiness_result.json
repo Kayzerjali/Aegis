@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aegis.dev/schemas/readiness_result.json",
+  "title": "ReadinessResult",
+  "description": "Produced by the Readiness Gate. Reports whether a PlanDocument meets the minimum requirements for the Build stage.",
+  "type": "object",
+  "required": [
+    "aegis_version",
+    "document_type",
+    "document_id",
+    "project_id",
+    "task_id",
+    "timestamp",
+    "stage",
+    "status",
+    "plan_document_id",
+    "passed",
+    "checklist"
+  ],
+  "properties": {
+    "aegis_version": { "type": "string" },
+    "document_type": { "type": "string", "const": "ReadinessResult" },
+    "document_id": { "type": "string", "format": "uuid" },
+    "parent_document_id": { "type": ["string", "null"] },
+    "project_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "stage": { "type": "string", "enum": ["plan", "build", "review"] },
+    "status": { "type": "string", "enum": ["draft", "validated", "rejected", "approved"] },
+    "plan_document_id": {
+      "type": "string",
+      "description": "UUID of the PlanDocument being evaluated"
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "Whether the PlanDocument met all readiness requirements"
+    },
+    "checklist": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["requirement", "status"],
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "enum": [
+              "behavioral_description",
+              "input_output_spec",
+              "acceptance_criteria",
+              "scope_boundaries",
+              "architecture_decisions",
+              "risk_identification"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["met", "unmet"]
+          },
+          "detail": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "gaps_summary": {
+      "type": ["string", "null"],
+      "description": "Human-readable summary of what is still needed, null if all checks passed"
+    }
+  },
+  "additionalProperties": true
+}
