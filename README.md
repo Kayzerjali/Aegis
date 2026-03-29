@@ -14,6 +14,7 @@ This project is in the architectural planning phase. See the [`docs/`](docs/) di
 - **[INTERFACE_SCHEMAS.md](docs/INTERFACE_SCHEMAS.md)** — Draft JSON schemas for all interface documents
 - **[ROADMAP.md](docs/ROADMAP.md)** — Phased development plan (Aegis → Thoth → Eidolon)
 - **[IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — Practical details: CLI design, engine adapters, workspace isolation, cost strategy
+- **[PLAN_OF_ATTACK.md](docs/PLAN_OF_ATTACK.md)** — Sprint-by-sprint execution plan with definitions of done
 - **[DECISIONS.md](docs/DECISIONS.md)** — Architectural Decision Records (ADRs)
 
 ## Core Ideas
