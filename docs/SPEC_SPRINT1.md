@@ -8,6 +8,47 @@
 
 Aegis is a CLI tool that orchestrates AI coding agents through a Plan → Build → Review pipeline. Sprint 1 builds the skeleton: the pipeline runs end-to-end with mock agents, and all inter-stage communication happens through schema-validated JSON documents. The Readiness Gate mechanically enforces plan quality before any code generation begins.
 
+### Dependency Documents
+
+The following documents in the `docs/` directory provide detailed context referenced by this spec. The agent should consult them as needed:
+
+- **INTERFACE_SCHEMAS.md** — Complete JSON structure definitions for every interface document (PlanDocument, BuildReport, ReviewReport, PlanningSession, ReadinessResult). Includes all field names, types, nesting, and the common document header.
+- **ARCHITECTURE.md** — Three-stage pipeline design, SOLID principles mapping, Readiness Gate checklist items, loop guard definitions.
+- **VISION.md** — Why Aegis exists, what problems it solves, what it is NOT.
+- **IMPLEMENTATION.md** — Project structure overview, engine adapter interface, workspace isolation design, CLI command list.
+
+## Global Constraints
+
+These apply to ALL stages in this sprint:
+
+### Design Principles
+- Follow **SOLID principles** throughout. Each module should have a single responsibility. Components should depend on abstractions, not concrete implementations. New functionality should be addable without modifying existing code.
+- Design for **testability**. Every component should be testable in isolation with no external dependencies (no network, no filesystem side-effects in unit tests, no AI engines).
+- Prefer **composition over inheritance** where reasonable.
+
+### Testing
+- Use **pytest** as the test framework.
+- Tests live in a `tests/` directory at the project root, mirroring the source structure.
+- Write tests that verify **behavior** (what the component does), not implementation (how it does it internally).
+
+### Development Workflow Per Stage
+Each stage follows this order:
+
+1. **Scaffold** — Create the minimum structure needed for tests to be importable and runnable (even if they fail). For Stage 1 only, this includes creating the package itself.
+2. **Write tests** — From the acceptance criteria. Tests should fail initially (red).
+3. **Mutation test** — Run `mutmut` against any logic-bearing code to verify test quality. Target ≥80% mutation score. *Note: stages that are primarily data/config (Stage 1, Stage 4) may have limited mutatable code. Mutation testing is most valuable for Stages 2, 3, 5, 6.*
+4. **Implement** — Write the minimum code to pass all tests (green).
+5. **Verify** — Run full test suite. Confirm mutation score if applicable.
+6. **Commit** — Commit the working state.
+
+### Stage 1 Bootstrapping Exception
+Stage 1 has a circular dependency: you can't test "pip install works" without the package existing. For Stage 1 only, the workflow is:
+1. Create the package scaffolding (pyproject.toml, __init__.py, CLI stub, empty schema files)
+2. Verify `pip install -e .` and `aegis --help` work
+3. Write tests for schema validity and document validation behavior
+4. Populate the schema files with real JSON Schema content
+5. Verify tests pass
+
 ## Architecture Vision
 
 Three stages connected by typed JSON documents. Each stage is a node (or subgraph) in a LangGraph state machine. Documents flow forward through the pipeline. The Readiness Gate sits between Plan and Build as a hard validation checkpoint.
@@ -247,12 +288,22 @@ Wire the pipeline to user-facing CLI commands. The user types `aegis plan`, the 
 
 ## Spec Format Rationale
 
-This spec intentionally does NOT prescribe:
+### What the spec prescribes
+- **Vision** — Why the component exists in the system (context)
+- **Requirements** — What it must achieve, as outcomes
+- **Constraints** — Hard boundaries: libraries, principles (SOLID), patterns, non-negotiables
+- **Acceptance criteria** — Testable conditions for "done"
+- **Dependency documents** — Other docs the agent should consult for detailed context
+- **Global constraints** — Design principles, testing framework, development workflow
+- **Bootstrapping exceptions** — Where the standard workflow doesn't cleanly apply and why
+
+### What the spec does NOT prescribe
 - Class names, method signatures, or function names
 - File paths or module structure (beyond the top-level package)
 - Internal data structures or algorithms
 - Implementation order within a stage
 
-These are left to the agent's judgment. The spec defines **what** must be achieved (requirements), **what must not happen** (constraints), and **how to verify it works** (acceptance criteria). The agent reasons about the best implementation approach within these bounds.
+### Why this format
+AI agents reason best when given a well-defined problem space: clear goals, clear walls, but freedom to find the path. Prescriptive specs (write this class, this method, this file) reduce the agent to a typist. Vague specs ("build a validator") let the agent fill gaps with hallucinated assumptions. This format sits in the middle: the agent understands what success looks like and what rules it must follow, but chooses its own implementation approach.
 
 This format will be the template for PlanDocuments that Aegis's Planning Advisor generates in production.
