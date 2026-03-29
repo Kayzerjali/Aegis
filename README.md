@@ -13,6 +13,7 @@ This project is in the architectural planning phase. See the [`docs/`](docs/) di
 - **[PIPELINE.md](docs/PIPELINE.md)** — Detailed breakdown of every pipeline component and data flow
 - **[INTERFACE_SCHEMAS.md](docs/INTERFACE_SCHEMAS.md)** — Draft JSON schemas for all interface documents
 - **[ROADMAP.md](docs/ROADMAP.md)** — Phased development plan (Aegis → Thoth → Eidolon)
+- **[IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** — Practical details: CLI design, engine adapters, workspace isolation, cost strategy
 - **[DECISIONS.md](docs/DECISIONS.md)** — Architectural Decision Records (ADRs)
 
 ## Core Ideas
